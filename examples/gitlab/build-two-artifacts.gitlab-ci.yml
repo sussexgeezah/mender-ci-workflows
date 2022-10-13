@@ -1,0 +1,124 @@
+#
+# The example shows how to build, upload and deploy Mender Artifacts for two different 
+# device types in paralel.
+#
+# 'MENDER_SERVER_ACCESS_TOKEN' secret is required to be set in GitLab repo settings
+#
+
+stages:
+  - build
+  - publish
+  - deploy
+
+include:
+  - project: 'Northern.tech/Mender/mender-ci-workflows'
+    file: 'templates/gitlab/mender-artifact-build.gitlab-ci.yml'
+    ref: 'master'
+  - project: 'Northern.tech/Mender/mender-ci-workflows'
+    file: 'templates/gitlab/mender-artifact-upload.gitlab-ci.yml'
+    ref: 'master'
+  - project: 'Northern.tech/Mender/mender-ci-workflows'
+    file: 'templates/gitlab/mender-deployment-create.gitlab-ci.yml'
+    ref: 'master'
+
+variables:
+  MENDER_SERVER_URL: https://hosted.mender.io # Mender server URL
+  MENDER_DEVICES_GROUP_NAME_ONE: group-one # The name of Mender devices group a deployment with Mender Artifact name `MENDER_ARTIFACT_NAME_ONE` will be triggered to
+  MENDER_DEVICES_GROUP_NAME_TWO: group-two # The name of Mender devices group a deployment with Mender Artifact name `MENDER_ARTIFACT_NAME_TWO` will be triggered to
+  MENDER_ARTIFACT_NAME_ONE: artifact_one.mender # First Mender Artifact file name in the `MENDER_ARTIFACTS_FOLDER` folder
+  MENDER_ARTIFACT_NAME_TWO: artifact_two.mender # Second Mender Artifact file name in the `MENDER_ARTIFACTS_FOLDER` folder
+  MENDER_RELEASE_NAME_ONE: auth_keys-1.0 # The name of Mender release for Mender Artifact name `MENDER_ARTIFACT_NAME_ONE`
+  MENDER_RELEASE_NAME_TWO: some_config-1.0 # The name of Mender release for Mender Artifact name `MENDER_ARTIFACT_NAME_TWO`
+
+#
+# Builds Mender Artifacts using 'mender-artifact' tool
+#
+mender:build:artifact:one:
+  stage: build
+  extends: .mender:build:artifact
+  script:
+    - echo /home/root/.ssh > dest_dir
+    - echo authorized_keys > filename
+    - echo key > authorized_keys
+    - |
+      mender-artifact write module-image \
+        -T single-file \
+        --device-type raspberrypi4 \
+        -o ${MENDER_ARTIFACTS_FOLDER}/${MENDER_ARTIFACT_NAME_ONE} \
+        -n ${MENDER_RELEASE_NAME_ONE} \
+        --software-name auth_keys \
+        --software-version 1.0 \
+        -f dest_dir \
+        -f filename \
+        -f authorized_keys
+
+mender:build:artifact:two:
+  stage: build
+  extends: .mender:build:artifact
+  script:
+    - echo /home/root/.ssh > dest_dir
+    - echo authorized_keys > filename
+    - echo key > authorized_keys
+    - |
+      mender-artifact write module-image \
+        -T single-file \
+        --device-type raspberrypi4 \
+        -o ${MENDER_ARTIFACTS_FOLDER}/${MENDER_ARTIFACT_NAME_TWO} \
+        -n ${MENDER_RELEASE_NAME_TWO} \
+        --software-name authorized_keys \
+        --software-version 1.0 \
+        -f dest_dir \
+        -f filename \
+        -f authorized_keys
+
+#
+# Uploads built Mender Artifacts
+#
+mender:upload:artifact:one:
+  stage: publish
+  needs:
+    - mender:build:artifact:one
+  extends: .mender:upload:artifact
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ "main"'
+  before_script:
+    - MENDER_ARTIFACT_NAME=${MENDER_ARTIFACT_NAME_ONE} # `MENDER_ARTIFACT_NAME` variable defines first Mender Artifact file name in the `MENDER_ARTIFACTS_FOLDER` folder
+
+mender:upload:artifact:two:
+  stage: publish
+  needs:
+    - mender:build:artifact:two
+  extends: .mender:upload:artifact
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ "main"'
+  before_script:
+    - MENDER_ARTIFACT_NAME=${MENDER_ARTIFACT_NAME_TWO} # `MENDER_ARTIFACT_NAME` variable defines second Mender Artifact file name in the `MENDER_ARTIFACTS_FOLDER` folder
+
+#
+# Creates deployments
+#
+mender:create:deployment:one:
+  stage: deploy
+  needs:
+    - mender:upload:artifact:one
+  extends:
+    - .mender:create:deployment
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ "main"'
+  before_script:
+    - MENDER_DEPLOYMENT_GROUP=${MENDER_DEVICES_GROUP_NAME_ONE} # `MENDER_DEPLOYMENT_GROUP` variable defines the name of Mender devices group a deployment will be triggered to
+    - MENDER_RELEASE_NAME=${MENDER_RELEASE_NAME_ONE} # `MENDER_RELEASE_NAME` variable defines the name of Mender release
+    - MENDER_DEPLOYMENT_NAME="one_${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}" # `MENDER_DEPLOYMENT_NAME` variable defines the name of Mender deployment
+
+mender:create:deployment:two:
+  stage: deploy
+  needs:
+    - mender:upload:artifact:two
+  extends:
+    - .mender:create:deployment
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ "main"'
+  before_script:
+    - MENDER_DEPLOYMENT_GROUP=${MENDER_DEVICES_GROUP_NAME_TWO} # `MENDER_DEPLOYMENT_GROUP` variable defines the name of Mender devices group a deployment will be triggered to
+    - MENDER_RELEASE_NAME=${MENDER_RELEASE_NAME_TWO} # `MENDER_RELEASE_NAME` variable defines the name of Mender release
+    - MENDER_DEPLOYMENT_NAME="two_${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}" # `MENDER_DEPLOYMENT_NAME` variable defines the name of Mender deployment

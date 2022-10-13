@@ -1,0 +1,2 @@
+variables:
+  MENDER_ARTIFACTS_FOLDER: "mender-artifacts"   # GitLab CI artifacts folder shared across all Mender templates

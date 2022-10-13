@@ -4,6 +4,7 @@ Mender team provides templates for different CI/CD systems for the most common u
 
 ## Supported CI/CD Systems
 - [GitHub Actions](templates/github/)
+- [GitLab CI](templates/gitlab/)
 
 ## Contributing
 
