@@ -1,5 +1,4 @@
 # files generate by license check ,tmp files
-*.txt
 !*LICENSE.txt
 license.tmp
 .*.sw?
