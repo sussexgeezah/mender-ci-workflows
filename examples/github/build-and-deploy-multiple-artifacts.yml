@@ -1,0 +1,84 @@
+#
+# The example shows how to build, upload and deploy Mender Artifacts for two different 
+# device types in paralel.
+#
+# 'MENDER_SERVER_ACCESS_TOKEN' secret is required to be set in GitHub repo settings.
+#
+
+name: Build and Deploy Two Mender Artifacts
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  MENDER_SERVER_URL: https://hosted.mender.io       # Mender server URL
+  MENDER_DEPLOYMENT_DEVICES_GROUP_PREFIX: group-dev # Mender deployment name prefix
+
+jobs:
+  #
+  # Build two Mender artifacts and deploy them to related groups
+  #
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    # run multiply jobs for different device types
+    strategy:
+      matrix:
+        device: ["sensor", "executive"]
+    # conrainer with pre-installed mender-artifact and mender-cli tools
+    container:
+      image: mendersoftware/mender-ci-tools:mender-master
+    steps:
+      # Checkout git repository
+      - uses: actions/checkout@v2
+      # Generates the required variables to later create the Mender Artifact, using a dummy application
+      # name "change-the-world-to-better" with a random version.
+      - name: Generrate Mender release name
+        run: |
+          APP_NAME=change-the-world-to-better
+          VERSION="$(($RANDOM%9+1)).$(($RANDOM%9+1)).$(($RANDOM%9+1))"
+          MENDER_RELEASE_NAME=${APP_NAME}_v${VERSION}
+          echo "MENDER_RELEASE_NAME=${MENDER_RELEASE_NAME}" >> ${GITHUB_ENV}
+      # Generates Mender deployment name to later create the Mender deployment
+      - name: Generate Mender deployment name
+        run: |
+          COMMIT_SHORT_SHA="${GITHUB_SHA:0:8}"
+          MENDER_DEPLOYMENT_NAME=${{ matrix.device }}_${MENDER_RELEASE_NAME}_${COMMIT_SHORT_SHA}
+          echo "MENDER_DEPLOYMENT_NAME=${MENDER_DEPLOYMENT_NAME}" >> ${GITHUB_ENV}
+      # Creates Mender Artifact, using randomly generated dummy name
+      - name: Create Mender Artifact
+        run: |
+          MENDER_ARTIFACT_NAME=artifact_$(( $RANDOM % 9999 + 1000 )).mender
+          echo /home/root/.ssh > dest_dir
+          echo authorized_keys > filename
+          echo key > authorized_keys
+          SOFTWARE_NAME=${{ matrix.device }}
+          SOFTWARE_VERSION="$(($RANDOM%9+1)).$(($RANDOM%9+1))"
+          mender-artifact write module-image \
+            -T single-file \
+            --device-type raspberrypi4 \
+            -o ${MENDER_ARTIFACT_NAME} \
+            -n ${MENDER_RELEASE_NAME} \
+            --software-name ${SOFTWARE_NAME} \
+            --software-version ${SOFTWARE_VERSION} \
+            -f dest_dir \
+            -f filename \
+            -f authorized_keys
+          echo "MENDER_ARTIFACT_NAME=${MENDER_ARTIFACT_NAME}" >> ${GITHUB_ENV}
+      # Uploads Mender Artifact to a Mender server, using previously generated Mender Artifact name
+      - name: Upload Mender Artifacts to Mender server
+        uses: mendersoftware/mender-gh-action-upload-artifact@master
+        with:
+          mender_pat: ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}
+          mender_artifact: ${{ env.MENDER_ARTIFACT_NAME }}
+          mender_uri: ${{ env.MENDER_SERVER_URL }}
+      # Creates a deployment on a Mender server, using previously generated Mender deployment and release names
+      - name: Create deployment on Mender server
+        uses: mendersoftware/mender-gh-action-create-deployment@master
+        with:
+          mender_pat: ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}
+          mender_uri: ${{ env.MENDER_SERVER_URL }}
+          mender_deployment_name: ${{ env.MENDER_DEPLOYMENT_NAME }}
+          mender_release_name: ${{ env.MENDER_RELEASE_NAME }}
+          mender_devices_group: ${{ env.MENDER_DEPLOYMENT_DEVICES_GROUP_PREFIX }}-${{ matrix.device }}

@@ -1,0 +1,141 @@
+#
+# The example shows how to build, upload and deploy a Mender Artifact.
+#
+# 'MENDER_SERVER_ACCESS_TOKEN' secret is required to be set in GitHub repo settings.
+#
+
+name: Build Mender Artifact and trigger a deployment
+
+on:
+  pull_request:
+    branches:
+      - main
+      - production
+    types:
+      - closed
+
+env:
+  MENDER_SERVER_URL: https://hosted.mender.io         # Mender server URL
+  MENDER_DEPLOYMENT_DEVICES_GROUP_DEV: group-dev      # Mender development deployment name
+  MENDER_DEPLOYMENT_DEVICES_GROUP_PROD: group-prod    # Mender production deployment name
+  MENDER_ARTIFACTS_CI_ARTIFACT_NAME: mender-artifacts # GitHub Actions artifact name
+  MENDER_ARTIFACTS_CI_ARTIFACT_PATH: mender-artifacts # GitHub Actions artifact path
+
+jobs:
+  #
+  # Build Mender artifact
+  #
+  build:
+    runs-on: ubuntu-latest
+    # conrainer with pre-installed mender-artifact and mender-cli tools
+    container:
+      image: mendersoftware/mender-ci-tools:mender-master
+    outputs:
+      mender_release_name: ${{ steps.release_name.outputs.mender_release_name }}
+      mender_devices_group: ${{ steps.deployment_group.outputs.mender_devices_group }}
+      mender_deployment_name: ${{ steps.deployment_name.outputs.mender_deployment_name }}
+      mender_artifact_name: ${{ steps.create_artifact.outputs.mender_artifact_name }}
+    steps:
+      # Checkout git repository
+      - uses: actions/checkout@v2
+      # Initialise the workspace
+      - name: Init workspace
+        run: |
+          mkdir -p ${MENDER_ARTIFACTS_CI_ARTIFACT_PATH}
+      # Generates the required variables to later create the Mender Artifact, using a dummy application
+      # name "change-the-world-to-better" with a random version.
+      - name: Generate Mender release name
+        id: release_name
+        run: |
+          APP_NAME=change-the-world-to-better
+          VERSION="$(($RANDOM%9+1)).$(($RANDOM%9+1)).$(($RANDOM%9+1))"
+          MENDER_RELEASE_NAME=${APP_NAME}_v${VERSION}
+          echo "MENDER_RELEASE_NAME=${MENDER_RELEASE_NAME}" >> ${GITHUB_ENV}
+          echo "mender_release_name=${MENDER_RELEASE_NAME}" >> ${GITHUB_OUTPUT}
+      # Selects one of MENDER_DEPLOYMENT_DEVICES_GROUP_DEV or MENDER_DEPLOYMENT_DEVICES_GROUP_PROD
+      # Mender deployment group name based on the branch name to later create the Mender deployment
+      - name: Choose Mender deployment group
+        id: deployment_group
+        run: |
+          if [[ "${GITHUB_BASE_REF}" == "production" ]]; then
+            MENDER_DEPLOYMENT_DEVICES_GROUP=${MENDER_DEPLOYMENT_DEVICES_GROUP_PROD}
+          elif [[ "${GITHUB_BASE_REF}" == "main" ]]; then
+            MENDER_DEPLOYMENT_DEVICES_GROUP=${MENDER_DEPLOYMENT_DEVICES_GROUP_DEV}
+          else
+            echo "ERROR: workflow execution on not supported branch"
+            exit 1
+          fi
+          echo "mender_devices_group=${MENDER_DEPLOYMENT_DEVICES_GROUP}" >> ${GITHUB_OUTPUT}
+      # Generates Mender deployment name to later create the Mender deployment
+      - name: Generate Mender deployment name
+        id: deployment_name
+        run: |
+          COMMIT_SHORT_SHA="${GITHUB_SHA:0:8}"
+          MENDER_DEPLOYMENT_NAME=${MENDER_RELEASE_NAME}_${COMMIT_SHORT_SHA}
+          echo "mender_deployment_name=${MENDER_DEPLOYMENT_NAME}" >> ${GITHUB_OUTPUT}
+      # Creates Mender Artifact, using randomly generated dummy name
+      - name: Create Mender Artifact
+        id: create_artifact
+        run: |
+          MENDER_ARTIFACT_NAME=artifact_${MENDER_RELEASE_NAME}.mender
+          echo /home/root/.ssh > dest_dir
+          echo authorized_keys > filename
+          echo key > authorized_keys
+          mender-artifact write module-image \
+            -T single-file \
+            --device-type raspberrypi4 \
+            -o ${MENDER_ARTIFACTS_CI_ARTIFACT_PATH}/${MENDER_ARTIFACT_NAME} \
+            -n ${MENDER_RELEASE_NAME} \
+            --software-name authorized_keys \
+            --software-version 1.0, \
+            -f dest_dir \
+            -f filename \
+            -f authorized_keys
+          echo "mender_artifact_name=${MENDER_ARTIFACT_NAME}" >> ${GITHUB_OUTPUT}
+      # Uploads GitHub Actions artifacts to GitHub artifact storage to pass them to the further jobs
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.MENDER_ARTIFACTS_CI_ARTIFACT_NAME }}
+          path: ${{ env.MENDER_ARTIFACTS_CI_ARTIFACT_PATH }}
+
+  #
+  # Upload Built Mender artifact to a Mender server
+  #
+  publish:
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      # Downloads built in previous job GitHub Actions artifacts
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.MENDER_ARTIFACTS_CI_ARTIFACT_NAME }}
+          path: ${{ env.MENDER_ARTIFACTS_CI_ARTIFACT_PATH }}
+      # Uploads Mender Artifact to a Mender server, using previously generated Mender Artifact name
+      - name: Upload Mender Artifact to Mender server
+        uses: mendersoftware/mender-gh-action-upload-artifact@master
+        with:
+          mender_pat: ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}
+          mender_artifact: ${{ env.MENDER_ARTIFACTS_CI_ARTIFACT_PATH }}/${{ needs.build.outputs.mender_artifact_name }}
+          mender_uri: ${{ env.MENDER_SERVER_URL }}
+
+  #
+  # Create Deployment on Mender server
+  #
+  deploy:
+    needs:
+      - build
+      - publish
+    runs-on: ubuntu-latest
+    steps:
+      # Creates a deployment on a Mender server, using previously generated Mender deployment and release names
+      - name: Create deployment on Mender server
+        uses: mendersoftware/mender-gh-action-create-deployment@master
+        with:
+          mender_pat: ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}
+          mender_uri: ${{ env.MENDER_SERVER_URL }}
+          mender_deployment_name: ${{ needs.build.outputs.mender_deployment_name }}
+          mender_release_name: ${{ needs.build.outputs.mender_release_name }}
+          mender_devices_group: ${{ needs.build.outputs.mender_devices_group }}
