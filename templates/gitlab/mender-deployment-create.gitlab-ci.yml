@@ -1,0 +1,72 @@
+# Use this template to create a deployment for a Mender Artifact from MENDER_ARTIFACTS_FOLDER folder.
+#
+# The template is designed to be used with the includes keyword or copied into an existing
+# configuration.
+#
+# The template requires the following environment variables:
+# - `MENDER_SERVER_URL`:          Mender server URL.
+# - `MENDER_SERVER_ACCESS_TOKEN`: Mender server access token.
+# - `MENDER_DEPLOYMENT_GROUP`:    The name of Mender devices group a deployment will be triggered to.
+#                                 One of `MENDER_DEPLOYMENT_GROUP` or `MENDER_DEVICES_LIST` is required.
+#                                 `MENDER_DEVICES_LIST` takes the priority if both are set.
+# - `MENDER_DEVICES_LIST`:        The list of Mender devices a deployment will be triggered to.
+# - `MENDER_DEPLOYMENT_NAME`:     The name of Mender deployment.
+# - `MENDER_RELEASE_NAME`:        The name of Mender release.
+
+include:
+  - project: 'Northern.tech/Mender/mender-ci-workflows'
+    file: 'templates/gitlab/common.gitlab-ci.yml'
+    ref: 'master'
+
+variables:
+  MENDER_DEPLOYMENT_GROUP: "" # The name of Mender devices group a deployment will be triggered to. One of `MENDER_DEPLOYMENT_GROUP` or `MENDER_DEVICES_LIST` is required. `MENDER_DEVICES_LIST` takes the priority if both are set
+  MENDER_DEVICES_LIST: ""     # The list of Mender devices a deployment will be triggered to
+  MENDER_RELEASE_NAME: ""     # The name of Mender release
+  MENDER_DEPLOYMENT_NAME: ""  # The name of Mender deployment
+
+.mender:create:deployment:
+  image: mendersoftware/mender-ci-tools:mender-master
+  script:
+    # input validation
+    - if [ -z "${MENDER_SERVER_URL}" ]; then
+    -   'echo "ERROR: MENDER_SERVER_URL is not defined found."'
+    -   exit 1
+    - fi
+    - if [ -z "${MENDER_SERVER_ACCESS_TOKEN}" ]; then
+    -   'echo "ERROR: MENDER_SERVER_ACCESS_TOKEN is not defined found."'
+    -   exit 1
+    - fi
+    - if [ -z "${MENDER_RELEASE_NAME}" ]; then
+    -   'echo "ERROR: MENDER_RELEASE_NAME is not defined found."'
+    -   exit 1
+    - fi
+    - if [ -z "${MENDER_DEPLOYMENT_NAME}" ]; then
+    -   'echo "ERROR: MENDER_DEPLOYMENT_NAME is not defined found."'
+    -   exit 1
+    - fi
+    - if [[ -z "${MENDER_DEVICES_LIST}" && -z "${MENDER_DEPLOYMENT_GROUP}" ]]
+    -   'echo "ERROR: it's expected at least one of MENDER_DEVICES_LIST and MENDER_DEPLOYMENT_GROUP is set but both are empty."'
+    -   exit 1
+    - fi
+    # get devices list by deployment group
+    # https://docs.mender.io/api/#management-api-device-inventory-get-devices-in-group
+    - if [[ -z "${MENDER_DEVICES_LIST}" && ! -z "${MENDER_DEPLOYMENT_GROUP}" ]]; then
+    -   'MENDER_DEVICES_LIST=$(curl -s 
+          -H "Authorization: Bearer ${MENDER_SERVER_ACCESS_TOKEN}" 
+          ${MENDER_SERVER_URL}/api/management/v1/inventory/groups/${MENDER_DEPLOYMENT_GROUP}/devices)'
+    - fi
+    # call create deployment endpoint
+    # https://docs.mender.io/api/#management-api-deployments-create-deployment
+    - 'RESPONSE=$(curl -s -w " http_response_code %{http_code}"
+        -X POST ${MENDER_SERVER_URL}/api/management/v1/deployments/deployments
+        -H "Content-Type: application/json"
+        -H "Accept: application/json"
+        -H "Authorization: Bearer ${MENDER_SERVER_ACCESS_TOKEN}"
+        --data-raw "{\"name\": \"${MENDER_DEPLOYMENT_NAME}\", \"artifact_name\": \"${MENDER_RELEASE_NAME}\", \"devices\": ${MENDER_DEVICES_LIST}}")'
+    - if [[ "${RESPONSE}" == " http_response_code 201" ]]; then
+    -   'echo "INFO: Deployment ${MENDER_DEPLOYMENT_NAME} successfully created"'
+    - else
+    -   'echo "ERROR: Failed to create deployment ${MENDER_DEPLOYMENT_NAME}, release: ${MENDER_RELEASE_NAME}, group: ${MENDER_DEPLOYMENT_GROUP} (${MENDER_DEVICES_LIST}), server: ${MENDER_SERVER_URL}"'
+    -   'echo "Server respoonse: ${RESPONSE}"'
+    -    exit 1
+    - fi

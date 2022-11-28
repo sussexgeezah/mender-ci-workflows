@@ -1,0 +1,34 @@
+# GitLab CI template to upload Mender artifacts from MENDER_ARTIFACTS_FOLDER folder
+# to a Mender server.
+#
+# The template is designed to be used with the include keyword or copied into an existing
+# configuration. It requires `MENDER_SERVER_URL` and `MENDER_SERVER_ACCESS_TOKEN` variables
+# to work and can be used to upload `MENDER_ARTIFACT_NAME` Mender Artifact from
+# `MENDER_ARTIFACTS_FOLDER` folder to a Mender server.
+
+include:
+  - project: 'Northern.tech/Mender/mender-ci-workflows'
+    file: 'templates/gitlab/common.gitlab-ci.yml'
+    ref: 'master'
+
+variables:
+  MENDER_ARTIFACT_NAME: "" # Mender Artifact file name in the `MENDER_ARTIFACTS_FOLDER` folder
+
+.mender:upload:artifact:
+  image: mendersoftware/mender-ci-tools:mender-master
+  script:
+    # input validation
+    - if [ -z "${MENDER_SERVER_URL}" ]; then
+    -   'echo "ERROR: MENDER_SERVER_URL is not defined found."'
+    -   exit 1
+    - fi
+    - if [ -z "${MENDER_SERVER_ACCESS_TOKEN}" ]; then
+    -   'echo "ERROR: MENDER_SERVER_ACCESS_TOKEN is not defined found."'
+    -   exit 1
+    - fi
+    - if ! ls ${MENDER_ARTIFACTS_FOLDER}/${MENDER_ARTIFACT_NAME} &>/dev/null; then
+    -   'echo "ERROR: file ${MENDER_ARTIFACTS_FOLDER}/${MENDER_ARTIFACT_NAME} is not found."'
+    -   exit 1
+    - fi
+    # upload Mender Artifact
+    - mender-cli artifacts upload --no-progress --server ${MENDER_SERVER_URL} --token-value ${MENDER_SERVER_ACCESS_TOKEN} ${MENDER_ARTIFACTS_FOLDER}/${MENDER_ARTIFACT_NAME}
