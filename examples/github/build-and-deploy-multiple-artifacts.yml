@@ -47,24 +47,25 @@ jobs:
           MENDER_DEPLOYMENT_NAME=${{ matrix.device }}_${MENDER_RELEASE_NAME}_${COMMIT_SHORT_SHA}
           echo "MENDER_DEPLOYMENT_NAME=${MENDER_DEPLOYMENT_NAME}" >> ${GITHUB_ENV}
       # Creates Mender Artifact, using randomly generated dummy name
+      # In this example, hello-mender.py represents a single file Python application that we have
+      # built and test in our CI and now we want to deploy into a device running Mender. We will
+      # package it as a Single File Application Update. For more information visit Mender docs:
+      # https://docs.mender.io/artifact-creation/create-an-artifact
       - name: Create Mender Artifact
         run: |
+          curl -O https://raw.githubusercontent.com/mendersoftware/mender-ci-workflows/master/examples/hello-mender.py
+          chmod 755 hello-mender.py
           MENDER_ARTIFACT_NAME=artifact_$(( $RANDOM % 9999 + 1000 )).mender
-          echo /home/root/.ssh > dest_dir
-          echo authorized_keys > filename
-          echo key > authorized_keys
           SOFTWARE_NAME=${{ matrix.device }}
           SOFTWARE_VERSION="$(($RANDOM%9+1)).$(($RANDOM%9+1))"
-          mender-artifact write module-image \
-            -T single-file \
+          single-file-artifact-gen \
             --device-type raspberrypi4 \
             -o ${MENDER_ARTIFACT_NAME} \
             -n ${MENDER_RELEASE_NAME} \
             --software-name ${SOFTWARE_NAME} \
             --software-version ${SOFTWARE_VERSION} \
-            -f dest_dir \
-            -f filename \
-            -f authorized_keys
+            --dest-dir /usr/local/bin \
+            hello-mender.py
           echo "MENDER_ARTIFACT_NAME=${MENDER_ARTIFACT_NAME}" >> ${GITHUB_ENV}
       # Uploads Mender Artifact to a Mender server, using previously generated Mender Artifact name
       - name: Upload Mender Artifacts to Mender server

@@ -31,21 +31,22 @@ jobs:
       # Checkout git repository
       - uses: actions/checkout@v2
       # Creates Mender Artifact
+      # In this example, hello-mender.py represents a single file Python application that we have
+      # built and test in our CI and now we want to deploy into a device running Mender. We will
+      # package it as a Single File Application Update. For more information visit Mender docs:
+      # https://docs.mender.io/artifact-creation/create-an-artifact
       - name: Create Mender Artifact
         run: |
-          echo /home/root/.ssh > dest_dir
-          echo authorized_keys > filename
-          echo key > authorized_keys
-          mender-artifact write module-image \
-            -T single-file \
+          curl -O https://raw.githubusercontent.com/mendersoftware/mender-ci-workflows/master/examples/hello-mender.py
+          chmod 755 hello-mender.py
+          single-file-artifact-gen \
             --device-type raspberrypi4 \
             -o ${MENDER_ARTIFACT_NAME} \
             -n ${MENDER_RELEASE_NAME} \
-            --software-name authorized_keys \
+            --software-name hello-mender \
             --software-version 1.0 \
-            -f dest_dir \
-            -f filename \
-            -f authorized_keys
+            --dest-dir /usr/local/bin \
+            hello-mender.py
       # Uploads Mender Artifact to a Mender server
       - name: Upload Mender Artifacts to Mender server
         uses: mendersoftware/mender-gh-action-upload-artifact@master

@@ -33,20 +33,21 @@ mender:build:artifact:
   stage: build
   extends: .mender:build:artifact
   script:
-    - echo /home/root/.ssh > dest_dir
-    - echo authorized_keys > filename
-    - echo key > authorized_keys
+    # In this example, hello-mender.py represents a single file Python application that we have
+    # built and test in our CI and now we want to deploy into a device running Mender. We will
+    # package it as a Single File Application Update. For more information visit Mender docs:
+    # https://docs.mender.io/artifact-creation/create-an-artifact
+    - curl -O https://raw.githubusercontent.com/mendersoftware/mender-ci-workflows/master/examples/hello-mender.py
+    - chmod 755 hello-mender.py
     - |
-      mender-artifact write module-image \
-        -T single-file \
+      single-file-artifact-gen \
         --device-type raspberrypi4 \
         -o ${MENDER_ARTIFACTS_FOLDER}/${MENDER_ARTIFACT_NAME} \
         -n ${MENDER_RELEASE_NAME} \
-        --software-name authorized_keys \
+        --software-name hello-mender \
         --software-version 1.0 \
-        -f dest_dir \
-        -f filename \
-        -f authorized_keys
+        --dest-dir /usr/local/bin \
+        hello-mender.py
 
 #
 # Uploads built artifact ${MENDER_ARTIFACTS_FOLDER}/${MENDER_ARTIFACT_NAME} to
