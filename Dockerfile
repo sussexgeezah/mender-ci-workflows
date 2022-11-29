@@ -23,13 +23,12 @@ ARG MENDER_CLIENT_VERSION
 RUN git clone -b $MENDER_CLIENT_VERSION https://github.com/mendersoftware/mender.git . && \
     DESTDIR=/install-modules-gen make install-modules-gen
 
-FROM alpine
+FROM debian:11.5-slim
 COPY --from=cli-builder /go/src/github.com/mendersoftware/mender-cli /usr/bin/
 COPY --from=artifact-builder /go/src/github.com/mendersoftware/mender-artifact/mender-artifact /usr/bin/
 COPY --from=client-builder /install-modules-gen/usr/bin/ /usr/bin/
-ARG MENDER_ARTIFACT_VERSION
 # The --mount instead of COPY is used to decrease the image layer size. Requires: 'export DOCKER_BUILDKIT=1'
-RUN --mount=type=bind,source=apk-requirements.txt,target=/apk-requirements.txt \
-    wget https://raw.githubusercontent.com/mendersoftware/mender-artifact/${MENDER_ARTIFACT_VERSION}/apk-run-requirements.txt && \
-    apk --no-cache add $(cat apk-requirements.txt apk-run-requirements.txt) && \
-    rm apk-run-requirements.txt
+RUN --mount=type=bind,source=deb-requirements.txt,target=/deb-requirements.txt \
+    apt-get update && \
+    apt-get install -y $(cat deb-requirements.txt) && \
+    rm -rf /var/lib/apt/lists/*
