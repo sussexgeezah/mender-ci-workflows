@@ -1,0 +1,59 @@
+# Use this template to upload a Mender Artifact to a Mender server.
+#
+# The template is Azure DevOps step template with parameters. It's designed to be included
+# from the GitHub repository.
+#
+# The template has the following parameters:
+# - `mender_uri`:      Mender server URL (default: https://hosted.mender.io).
+# - `mender_pat`:      Mender server access token.
+# - `mender_artifact`: Path of Mender Artifact file, relative to $(System.DefaultWorkingDirectory).
+
+parameters:
+- name: 'mender_uri'
+  type: string
+  default: 'https://hosted.mender.io'
+- name: 'mender_pat'
+  type: string
+- name: 'mender_artifact'
+  type: string
+
+steps:
+- script: |
+    # input validation
+    if [ -z "${{ parameters.mender_uri }}" ]; then
+      echo "ERROR: mender_uri is not found."
+      exit 1
+    fi
+    if [ -z "${{ parameters.mender_pat }}" ]; then
+      echo "ERROR: mender_pat is not found."
+      exit 1
+    fi
+    if ! ls ${{ parameters.mender_artifact }} &>/dev/null; then
+      echo "ERROR: file ${{ parameters.mender_artifact }} is not found."
+      exit 1
+    fi
+    # check requirements
+    if [ ! -f $(which curl) ]; then
+      echo "ERROR: 'curl' is missing"
+      exit 1
+    fi
+    # Makes management 'upload artifact' API call to Mender server, using curl
+    # https://docs.mender.io/api/#management-api-deployments-upload-artifact
+    RESPONSE=$(curl -s -X POST ${{ parameters.mender_uri }}/api/management/v1/deployments/artifacts \
+      -H "Content-Type: multipart/form-data" \
+      -H "Accept: application/json" \
+      -H "Authorization: Bearer ${{ parameters.mender_pat }}" \
+      -F artifact=@${{ parameters.mender_artifact }})
+    if [[ ! -z "$RESPONSE" || "$RESPONSE" != "" ]]; then
+      if $(echo ${RESPONSE} | grep -q "An artifact with the same name has conflicting depends"); then
+        echo "WARN: artifact ${{ parameters.mender_artifact }} already exists on the server ${{ parameters.mender_uri }}, upload is skipped"
+        echo "Server's response: ${RESPONSE}"
+        exit 0
+      else
+        echo "ERROR: failed to upload artifact ${{ parameters.mender_artifact }} to ${{ parameters.mender_uri }}"
+        echo "Server's response: ${RESPONSE}"
+        exit 1
+      fi
+    fi
+    echo "INFO: artifact ${{ parameters.mender_artifact }} successfully uploaded to ${{ parameters.mender_uri }}"
+  displayName: 'Upload Mender Artifact'
