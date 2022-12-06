@@ -1,6 +1,6 @@
 # GitLab CI Templates for Mender
 
-`mendersoftware/mender-ci-tools` image is used for the jobs. It's based on `alpine` with pre-installed `mender-cli` and `mender-artifact` tools.
+`mendersoftware/mender-ci-tools` image with pre-installed `mender-cli` and `mender-artifact` tools is used for the templates.
 
 Pipelines examples can be found in the related [folder](../../examples/gitlab/).
 

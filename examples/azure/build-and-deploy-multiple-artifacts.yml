@@ -1,0 +1,193 @@
+#
+# The example shows how to build, upload and deploy Mender Artifacts for two different devices.
+#
+# 'MENDER_SERVER_ACCESS_TOKEN' secret is required to be set in Azure DevOps pipeline settings.
+#
+
+# specific branch build
+trigger:
+  branches:
+    include:
+    - main
+
+
+variables:
+- name: MENDER_SERVER_URL # Mender server's URL
+  value: https://hosted.mender.io
+- name: MENDER_ARTIFACT_NAME_ONE # First Mender Artifact's file name
+  value: artifact_one.mender
+- name: MENDER_ARTIFACT_NAME_TWO # Second Mender Artifact's file name
+  value: artifact_two.mender
+- name: MENDER_RELEASE_NAME_ONE # Mender release's name for the for the Mender Artifact name `MENDER_ARTIFACT_NAME_ONE`
+  value: release-1.0-gateway
+- name: MENDER_RELEASE_NAME_TWO # Mender release's name for the for the Mender Artifact name `MENDER_ARTIFACT_NAME_TWO`
+  value: release-1.0-sensor
+- name: MENDER_DEVICES_GROUP_NAME_ONE # The name of Mender devices group a deployment with Mender Artifact name `MENDER_ARTIFACT_NAME_ONE` will be triggered to
+  value: group-gateway
+- name: MENDER_DEVICES_GROUP_NAME_TWO # The name of Mender devices group a deployment with Mender Artifact name `MENDER_ARTIFACT_NAME_TWO` will be triggered to
+  value: group-sensor
+
+
+resources:
+  # Use other repositories for templates
+  # https://learn.microsoft.com/en-us/azure/devops/pipelines/process/templates
+  repositories:
+    - repository: templates
+      type: github
+      name: mendersoftware/mender-ci-workflows
+      ref: refs/heads/master
+      # GitHub service connection
+      # https://learn.microsoft.com/en-us/azure/devops/pipelines/library/service-endpoints
+      endpoint: github_service_connection
+
+
+jobs:
+#
+# Build Mender Artifacts using 'mender-artifact' tool
+#
+- job: build_mender_artifact_one
+  pool:
+    vmImage: ubuntu-latest
+  # container with pre-installed mender-artifact and mender-cli tools
+  container: mendersoftware/mender-ci-tools:mender-master
+  steps:
+  # Creates Mender Artifact
+  # In this example, hello-mender.py represents a single file Python application that we have
+  # built and test in our CI and now we want to deploy into a device running Mender. We will
+  # package it as a Single File Application Update. For more information visit the Mender docs:
+  # https://docs.mender.io/artifact-creation/create-an-artifact
+  - script: |
+      curl -O https://raw.githubusercontent.com/mendersoftware/mender-ci-workflows/master/examples/hello-mender.py
+      chmod 755 hello-mender.py
+      single-file-artifact-gen \
+        --device-type raspberrypi4 \
+        -o ${MENDER_ARTIFACT_NAME_ONE} \
+        -n ${MENDER_RELEASE_NAME_ONE} \
+        --software-name hello-mender \
+        --software-version 1.0 \
+        --dest-dir /usr/local/bin \
+        hello-mender.py
+    displayName: Build Mender Artifact
+  # Uploads Azure DevOps artifacts to Azure artifact storage to pass them to the further jobs
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: $(MENDER_ARTIFACT_NAME_ONE)
+      artifactName: mender_artifact_one
+    displayName: Publish the Azure DevOps artifact
+
+- job: build_mender_artifact_two
+  pool:
+    vmImage: ubuntu-latest
+  # conrainer with pre-installed mender-artifact and mender-cli tools
+  container: mendersoftware/mender-ci-tools:mender-master
+  steps:
+  # Creates Mender Artifact
+  # In this example, hello-mender.py represents a single file Python application that we have
+  # built and test in our CI and now we want to deploy into a device running Mender. We will
+  # package it as a Single File Application Update. For more information visit the Mender docs:
+  # https://docs.mender.io/artifact-creation/create-an-artifact
+  - script: |
+      curl -O https://raw.githubusercontent.com/mendersoftware/mender-ci-workflows/master/examples/hello-mender.py
+      chmod 755 hello-mender.py
+      single-file-artifact-gen \
+        --device-type raspberrypi4 \
+        -o ${MENDER_ARTIFACT_NAME_TWO} \
+        -n ${MENDER_RELEASE_NAME_TWO} \
+        --software-name hello-mender \
+        --software-version 1.0 \
+        --dest-dir /usr/local/bin \
+        hello-mender.py
+    displayName: Build Mender Artifact
+  # Uploads Azure DevOps artifacts to Azure artifact storage to pass them to the further jobs
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: $(MENDER_ARTIFACT_NAME_TWO)
+      artifactName: mender_artifact_two
+    displayName: Publish the Azure DevOps artifact
+
+
+#
+# Upload built Mender Artifacts to the Mender server
+#
+- job: upload_mender_artifact_one
+  dependsOn:
+  - build_mender_artifact_one
+  pool:
+    vmImage: ubuntu-latest
+  steps:
+  # Downloads built in previous job Azure DevOps artifacts
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      artifact: mender_artifact_one
+      patterns: $(MENDER_ARTIFACT_NAME_ONE)
+      path: $(System.DefaultWorkingDirectory)
+  # Uploads Mender Artifact to a Mender server
+  - template: templates/azure/mender-artifact-upload.yml@templates
+    parameters:
+      mender_uri: $(MENDER_SERVER_URL)
+      mender_pat: $(MENDER_SERVER_ACCESS_TOKEN)
+      mender_artifact: $(MENDER_ARTIFACT_NAME_ONE)
+
+- job: upload_mender_artifact_two
+  dependsOn:
+  - build_mender_artifact_two
+  pool:
+    vmImage: ubuntu-latest
+  steps:
+  # Downloads built in previous job Azure DevOps artifacts
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      artifact: mender_artifact_two
+      patterns: $(MENDER_ARTIFACT_NAME_TWO)
+      path: $(System.DefaultWorkingDirectory)
+  # Uploads Mender Artifact to a Mender server
+  - template: templates/azure/mender-artifact-upload.yml@templates
+    parameters:
+      mender_uri: $(MENDER_SERVER_URL)
+      mender_pat: $(MENDER_SERVER_ACCESS_TOKEN)
+      mender_artifact: $(MENDER_ARTIFACT_NAME_TWO)
+
+#
+# Create deployments on the Mender server
+#
+- job: create_deployment_one
+  dependsOn:
+  - upload_mender_artifact_one
+  pool:
+    vmImage: ubuntu-latest
+  steps:
+  # Sets Mender deployment name
+  - script: |
+      # set 'deployment_one' value of 'MENDER_DEPLOYMENT_NAME' variable to be available across the job
+      # https://learn.microsoft.com/en-us/azure/devops/pipelines/process/variables
+      echo "##vso[task.setvariable variable=MENDER_DEPLOYMENT_NAME;isOutput=true;]deployment_one"
+    name: set_variable
+  # Creates a deployment on a Mender server, using previously generated Mender deployment name
+  - template: templates/azure/mender-deployment-create.yml@templates
+    parameters:
+      mender_uri: $(MENDER_SERVER_URL)
+      mender_pat: $(MENDER_SERVER_ACCESS_TOKEN)
+      mender_deployment_name: $(set_variable.MENDER_DEPLOYMENT_NAME)
+      mender_release_name: $(MENDER_RELEASE_NAME_ONE)
+      mender_deployment_group: $(MENDER_DEVICES_GROUP_NAME_ONE)
+
+- job: create_deployment_two
+  dependsOn:
+  - upload_mender_artifact_two
+  pool:
+    vmImage: ubuntu-latest
+  steps:
+  # Sets Mender deployment name
+  - script: |
+      # set 'deployment_one' value of 'MENDER_DEPLOYMENT_NAME' variable to be available across the job
+      # https://learn.microsoft.com/en-us/azure/devops/pipelines/process/variables
+      echo "##vso[task.setvariable variable=MENDER_DEPLOYMENT_NAME;isOutput=true;]deployment_two"
+    name: set_variable
+  # Creates a deployment on a Mender server, using previously generated Mender deployment name
+  - template: templates/azure/mender-deployment-create.yml@templates
+    parameters:
+      mender_uri: $(MENDER_SERVER_URL)
+      mender_pat: $(MENDER_SERVER_ACCESS_TOKEN)
+      mender_deployment_name: $(set_variable.MENDER_DEPLOYMENT_NAME)
+      mender_release_name: $(MENDER_RELEASE_NAME_TWO)
+      mender_deployment_group: $(MENDER_DEVICES_GROUP_NAME_TWO)

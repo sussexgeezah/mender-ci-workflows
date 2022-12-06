@@ -1,0 +1,85 @@
+# Use this template to create a deployment for a Mender Artifact.
+#
+# The template is Azure DevOps step template with parameters. It's designed to be included
+# from the GitHub repository.
+#
+# The template has the following parameters:
+# - `mender_uri`:              Mender server URL (default: https://hosted.mender.io).
+# - `mender_pat`:              Mender server access token.
+# - `mender_deployment_name`:  The name of Mender deployment.
+# - `mender_release_name`:     The name of Mender release.
+# - `mender_devices_list`:     The list of Mender devices a deployment will be triggered to.
+# - `mender_deployment_group`: The name of Mender devices group a deployment will be triggered to.
+#                              One of `mender_deployment_group` or `mender_devices_list` is required.
+#                              `mender_devices_list` takes the priority if both are set.
+
+parameters:
+- name: 'mender_uri'
+  type: string
+  default: 'https://hosted.mender.io'
+- name: 'mender_pat'
+  type: string
+- name: 'mender_deployment_name'
+  type: string
+- name: 'mender_release_name'
+  type: string
+- name: 'mender_deployment_group'
+  type: string
+  default: ''
+- name: 'mender_devices_list'
+  type: string
+  default: ''
+
+steps:
+- script: |
+    # input validation
+    if [ -z "${{ parameters.mender_uri }}" ]; then
+      echo "ERROR: mender_uri is not found."
+      exit 1
+    fi
+    if [ -z "${{ parameters.mender_pat }}" ]; then
+      echo "ERROR: mender_pat is not found."
+      exit 1
+    fi
+    if [ -z "${{ parameters.mender_deployment_name }}" ]; then
+      echo "ERROR: mender_deployment_name is not found."
+      exit 1
+    fi
+    if [ -z "${{ parameters.mender_release_name }}" ]; then
+      echo "ERROR: mender_release_name is not found."
+      exit 1
+    fi
+    if [[ -z "${{ parameters.mender_devices_list }}" && -z "${{ parameters.mender_deployment_group }}" ]]; then
+      echo "ERROR: it's expected at least one of mender_devices_list and mender_deployment_group is set but both are empty."
+      exit 1
+    fi
+    # check requirements
+    if [ ! -f $(which curl) ]; then
+      echo "ERROR: 'curl' is missing"
+      exit 1
+    fi
+    if [[ -n "${{ parameters.mender_devices_list }}"  ]]; then
+      MENDER_DEVICES_LIST=${{ parameters.mender_devices_list }}
+    elif [[ -n "${{ parameters.mender_deployment_group }}" ]]; then
+      # get devices list by deployment group
+      # https://docs.mender.io/api/#management-api-device-inventory-get-devices-in-group
+      MENDER_DEVICES_LIST=$(curl -s \
+        -H "Authorization: Bearer ${{ parameters.mender_pat }}" \
+        ${{ parameters.mender_uri }}/api/management/v1/inventory/groups/${{ parameters.mender_deployment_group }}/devices)
+    fi
+    # call create deployment endpoint
+    # https://docs.mender.io/api/#management-api-deployments-create-deployment
+    RESPONSE=$(curl -s -w " http_response_code %{http_code}" \
+      -X POST ${{ parameters.mender_uri }}/api/management/v1/deployments/deployments \
+      -H "Content-Type: application/json" \
+      -H "Accept: application/json" \
+      -H "Authorization: Bearer ${{ parameters.mender_pat }}" \
+      --data-raw "{\"name\": \"${{ parameters.mender_deployment_name }}\", \"artifact_name\": \"${{ parameters.mender_release_name }}\", \"devices\": ${MENDER_DEVICES_LIST}}")
+    if [[ "${RESPONSE}" == " http_response_code 201" ]]; then
+      echo "INFO: Deployment ${{ parameters.mender_deployment_name }} successfully created"
+    else
+      echo "ERROR: Failed to create deployment ${{ parameters.mender_deployment_name }}, release: ${{ parameters.mender_release_name }}, group: ${{ parameters.mender_deployment_group }} (${MENDER_DEVICES_LIST}), server: ${{ parameters.mender_uri }}"
+      echo "Server respoonse: ${RESPONSE}"
+      exit 1
+    fi
+  displayName: 'Create deployment on Mender server'
