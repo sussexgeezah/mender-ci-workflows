@@ -16,7 +16,9 @@ WORKDIR /go/src/github.com/mendersoftware/mender-artifact
 ARG MENDER_ARTIFACT_VERSION
 RUN git clone https://github.com/mendersoftware/mender-artifact.git . && \
     git checkout $MENDER_ARTIFACT_VERSION && \
-    make get-build-deps && \
+    make get-build-deps || ( \
+        apt-get update -qq && \
+        apt-get install -yyq $(cat deb-requirements.txt) ) && \
     make build
 
 FROM golang:${GOLANG_VERSION} as client-builder
