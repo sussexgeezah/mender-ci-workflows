@@ -6,21 +6,24 @@ ARG MENDER_CLIENT_VERSION=3.4.0
 FROM golang:${GOLANG_VERSION} as cli-builder
 WORKDIR /go/src/github.com/mendersoftware/mender-cli
 ARG MENDER_CLI_VERSION
-RUN git clone -b $MENDER_CLI_VERSION https://github.com/mendersoftware/mender-cli.git . && \
+RUN git clone https://github.com/mendersoftware/mender-cli.git . && \
+    git checkout $MENDER_CLI_VERSION && \
     make get-deps && \
     make build
 
 FROM golang:${GOLANG_VERSION} as artifact-builder
 WORKDIR /go/src/github.com/mendersoftware/mender-artifact
 ARG MENDER_ARTIFACT_VERSION
-RUN git clone -b $MENDER_ARTIFACT_VERSION https://github.com/mendersoftware/mender-artifact.git . && \
+RUN git clone https://github.com/mendersoftware/mender-artifact.git . && \
+    git checkout $MENDER_ARTIFACT_VERSION && \
     make get-build-deps && \
     make build
 
 FROM golang:${GOLANG_VERSION} as client-builder
 WORKDIR /go/src/github.com/mendersoftware/mender
 ARG MENDER_CLIENT_VERSION
-RUN git clone -b $MENDER_CLIENT_VERSION https://github.com/mendersoftware/mender.git . && \
+RUN git clone https://github.com/mendersoftware/mender.git . && \
+    git checkout $MENDER_CLIENT_VERSION && \
     DESTDIR=/install-modules-gen make install-modules-gen
 
 FROM debian:11.5-slim
