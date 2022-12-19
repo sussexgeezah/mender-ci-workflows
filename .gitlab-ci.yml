@@ -13,3 +13,27 @@ include:
       - '.gitlab-ci-check-license.yml'
       - '.gitlab-ci-check-docker-build.yml'
       - '.gitlab-ci-github-status-updates.yml'
+
+.trigger:update-dependencies:mender-docs-site:
+  inherit:
+    variables: false
+  trigger:
+    project: Northern.tech/Mender/mender-docs-site
+    branch: master
+
+trigger:update-dependencies:mender-docs-site:tag:
+  # We keep this job in .pre so it can be run regardless of the rest of the pipeline failing
+  stage: .pre
+  extends: .trigger:update-dependencies:mender-docs-site
+  rules:
+    - if: $CI_COMMIT_TAG
+  variables:
+    MENDER_CI_WORKFLOWS_VERSION: "$CI_COMMIT_TAG"
+
+trigger:update-dependencies:mender-docs-site:manual:
+  # For the manual run, the user needs to set MENDER_CI_WORKFLOWS_VERSION
+  stage: publish
+  extends: .trigger:update-dependencies:mender-docs-site
+  when: manual
+  variables:
+    MENDER_CI_WORKFLOWS_VERSION: "$MENDER_CI_WORKFLOWS_VERSION"
