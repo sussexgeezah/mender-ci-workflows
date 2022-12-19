@@ -37,3 +37,60 @@ trigger:update-dependencies:mender-docs-site:manual:
   when: manual
   variables:
     MENDER_CI_WORKFLOWS_VERSION: "$MENDER_CI_WORKFLOWS_VERSION"
+
+.update-dependencies:
+  # It will run either on a parent trigger or manually
+  stage: publish
+  variables:
+    # Variables to be set by the parent pipeline
+    MENDER_CLI_VERSION: ""
+    MENDER_ARTIFACT_VERSION: ""
+    MENDER_CLIENT_VERSION: ""
+  image: debian:11-slim
+  before_script:
+    # Install and setup hub
+    - apt-get update && apt-get install -qqy hub
+    - export GITHUB_TOKEN="$GITHUB_BOT_TOKEN_REPO_FULL"
+    # Prepare SSH key
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan github.com >> ~/.ssh/known_hosts
+    # Configure git
+    - git config --global user.email "mender@northern.tech"
+    - git config --global user.name "Mender Test Bot"
+    # Prepare workspace
+    - hub clone mendersoftware/${CI_PROJECT_NAME} /tmp/${CI_PROJECT_NAME}
+    - cd /tmp/${CI_PROJECT_NAME}
+    - git checkout -b update-dependencies-$(date +%s)
+  script:
+    # Update dependencies
+    - 'changelog_entries=""'
+    - if [ -n "$MENDER_CLI_VERSION" ]; then
+    -   sed -i Dockerfile -e "s/MENDER_CLI_VERSION=.*/MENDER_CLI_VERSION=$MENDER_CLI_VERSION/"
+    -   'changelog_entries="${changelog_entries} --message \"Changelog: Update MENDER_CLI_VERSION to $MENDER_CLI_VERSION\""'
+    - fi
+    - if [ -n "$MENDER_ARTIFACT_VERSION" ]; then
+    -   sed -i Dockerfile -e "s/MENDER_ARTIFACT_VERSION=.*/MENDER_ARTIFACT_VERSION=$MENDER_ARTIFACT_VERSION/"
+    -   'changelog_entries="${changelog_entries} --message \"Changelog: MENDER_ARTIFACT_VERSION to $MENDER_ARTIFACT_VERSION\""'
+    - fi
+    - if [ -n "$MENDER_CLIENT_VERSION" ]; then
+    -   sed -i Dockerfile -e "s/MENDER_CLIENT_VERSION=.*/MENDER_CLIENT_VERSION=$MENDER_CLIENT_VERSION/"
+    -   'changelog_entries="${changelog_entries} --message \"Changelog: MENDER_CLIENT_VERSION to $MENDER_CLIENT_VERSION\""'
+    - fi
+    # Create pull request
+    - if ! git diff-index --quiet HEAD; then
+    -   git add Dockerfile
+    -   'eval git commit --signoff --message \"feat: Update dependencies\" ${changelog_entries} --message \"Ticket: None\"'
+    -   hub pull-request --push --base mendersoftware:master --message "Update dependencies"
+    - fi
+
+update-dependencies:parent:
+  extends: .update-dependencies
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "parent_pipeline"'
+
+update-dependencies:manual:
+  extends: .update-dependencies
+  when: manual
