@@ -12,6 +12,7 @@ include:
       - '.gitlab-ci-check-commits.yml'
       - '.gitlab-ci-check-license.yml'
       - '.gitlab-ci-check-docker-build.yml'
+      - '.gitlab-ci-check-docker-release-indep.yml'
       - '.gitlab-ci-github-status-updates.yml'
 
 .trigger:update-dependencies:mender-docs-site:
