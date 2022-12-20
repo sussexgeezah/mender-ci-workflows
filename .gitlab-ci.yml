@@ -90,7 +90,9 @@ trigger:update-dependencies:mender-docs-site:manual:
 update-dependencies:parent:
   extends: .update-dependencies
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "parent_pipeline"'
+    # CI_PIPELINE_SOURCE is 'pipeline' for multi-project pipelines. See:
+    # https://docs.gitlab.com/ee/ci/pipelines/downstream_pipelines.html#use-rules-to-control-downstream-pipeline-jobs
+    - if: '$CI_PIPELINE_SOURCE == "pipeline"'
 
 update-dependencies:manual:
   extends: .update-dependencies
