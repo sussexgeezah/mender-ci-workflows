@@ -2,7 +2,7 @@ ARG MENDER_CLI_VERSION=1.9.0
 ARG MENDER_ARTIFACT_VERSION=3.9.0
 ARG MENDER_CLIENT_VERSION=3.4.0
 
-FROM golang:1.19 as cli-builder
+FROM golang:1.20 as cli-builder
 WORKDIR /go/src/github.com/mendersoftware/mender-cli
 ARG MENDER_CLI_VERSION
 RUN git clone https://github.com/mendersoftware/mender-cli.git . && \
@@ -10,7 +10,7 @@ RUN git clone https://github.com/mendersoftware/mender-cli.git . && \
     make get-deps && \
     make build
 
-FROM golang:1.19 as artifact-builder
+FROM golang:1.20 as artifact-builder
 WORKDIR /go/src/github.com/mendersoftware/mender-artifact
 ARG MENDER_ARTIFACT_VERSION
 RUN git clone https://github.com/mendersoftware/mender-artifact.git . && \
@@ -20,7 +20,7 @@ RUN git clone https://github.com/mendersoftware/mender-artifact.git . && \
         apt-get install -yyq $(cat deb-requirements.txt) ) && \
     make build
 
-FROM golang:1.19 as client-builder
+FROM golang:1.20 as client-builder
 WORKDIR /go/src/github.com/mendersoftware/mender
 ARG MENDER_CLIENT_VERSION
 RUN git clone https://github.com/mendersoftware/mender.git . && \
