@@ -37,7 +37,7 @@ jobs:
       mender_artifact_name: ${{ steps.create_artifact.outputs.mender_artifact_name }}
     steps:
       # Checkout git repository
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       # Initialise the workspace
       - name: Init workspace
         run: |
@@ -116,7 +116,7 @@ jobs:
           path: ${{ env.MENDER_ARTIFACTS_CI_ARTIFACT_PATH }}
       # Uploads Mender Artifact to a Mender server, using previously generated Mender Artifact name
       - name: Upload Mender Artifact to Mender server
-        uses: mendersoftware/mender-gh-action-upload-artifact@master
+        uses: mendersoftware/mender-gh-action-upload-artifact@v1.0.0
         with:
           mender_pat: ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}
           mender_artifact: ${{ env.MENDER_ARTIFACTS_CI_ARTIFACT_PATH }}/${{ needs.build.outputs.mender_artifact_name }}
@@ -133,7 +133,7 @@ jobs:
     steps:
       # Creates a deployment on a Mender server, using previously generated Mender deployment and release names
       - name: Create deployment on Mender server
-        uses: mendersoftware/mender-gh-action-create-deployment@master
+        uses: mendersoftware/mender-gh-action-create-deployment@v1.0.0
         with:
           mender_pat: ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}
           mender_uri: ${{ env.MENDER_SERVER_URL }}

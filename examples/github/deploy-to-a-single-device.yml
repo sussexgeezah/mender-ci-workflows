@@ -29,7 +29,7 @@ jobs:
       image: mendersoftware/mender-ci-tools:1.0.0
     steps:
       # Checkout git repository
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       # Creates Mender Artifact
       # In this example, hello-mender.py represents a single file Python application that we have
       # built and test in our CI and now we want to deploy into a device running Mender. We will
@@ -49,14 +49,14 @@ jobs:
             hello-mender.py
       # Uploads Mender Artifact to a Mender server
       - name: Upload Mender Artifacts to Mender server
-        uses: mendersoftware/mender-gh-action-upload-artifact@master
+        uses: mendersoftware/mender-gh-action-upload-artifact@v1.0.0
         with:
           mender_pat: ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}
           mender_artifact: ${{ env.MENDER_ARTIFACT_NAME }}
           mender_uri: ${{ env.MENDER_SERVER_URL }}
       # Creates a deployment on a Mender server
       - name: Create deployment on Mender server
-        uses: mendersoftware/mender-gh-action-create-deployment@master
+        uses: mendersoftware/mender-gh-action-create-deployment@v1.0.0
         with:
           mender_pat: ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}
           mender_uri: ${{ env.MENDER_SERVER_URL }}

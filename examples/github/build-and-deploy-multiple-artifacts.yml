@@ -31,7 +31,7 @@ jobs:
       image: mendersoftware/mender-ci-tools:1.0.0
     steps:
       # Checkout git repository
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       # Generates the required variables to later create the Mender Artifact, using a dummy application
       # name "change-the-world-to-better" with a random version.
       - name: Generrate Mender release name
@@ -69,14 +69,14 @@ jobs:
           echo "MENDER_ARTIFACT_NAME=${MENDER_ARTIFACT_NAME}" >> ${GITHUB_ENV}
       # Uploads Mender Artifact to a Mender server, using previously generated Mender Artifact name
       - name: Upload Mender Artifacts to Mender server
-        uses: mendersoftware/mender-gh-action-upload-artifact@master
+        uses: mendersoftware/mender-gh-action-upload-artifact@v1.0.0
         with:
           mender_pat: ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}
           mender_artifact: ${{ env.MENDER_ARTIFACT_NAME }}
           mender_uri: ${{ env.MENDER_SERVER_URL }}
       # Creates a deployment on a Mender server, using previously generated Mender deployment and release names
       - name: Create deployment on Mender server
-        uses: mendersoftware/mender-gh-action-create-deployment@master
+        uses: mendersoftware/mender-gh-action-create-deployment@v1.0.0
         with:
           mender_pat: ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}
           mender_uri: ${{ env.MENDER_SERVER_URL }}
