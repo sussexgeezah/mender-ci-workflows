@@ -35,6 +35,7 @@ jobs:
       # Generates the required variables to later create the Mender Artifact, using a dummy application
       # name "change-the-world-to-better" with a random version.
       - name: Generrate Mender release name
+        shell: bash
         run: |
           APP_NAME=change-the-world-to-better
           VERSION="$(($RANDOM%9+1)).$(($RANDOM%9+1)).$(($RANDOM%9+1))"
@@ -42,6 +43,7 @@ jobs:
           echo "MENDER_RELEASE_NAME=${MENDER_RELEASE_NAME}" >> ${GITHUB_ENV}
       # Generates Mender deployment name to later create the Mender deployment
       - name: Generate Mender deployment name
+        shell: bash
         run: |
           COMMIT_SHORT_SHA="${GITHUB_SHA:0:8}"
           MENDER_DEPLOYMENT_NAME=${{ matrix.device }}_${MENDER_RELEASE_NAME}_${COMMIT_SHORT_SHA}
@@ -52,6 +54,7 @@ jobs:
       # package it as a Single File Application Update. For more information visit Mender docs:
       # https://docs.mender.io/artifact-creation/create-an-artifact
       - name: Create Mender Artifact
+        shell: bash
         run: |
           curl -O https://raw.githubusercontent.com/mendersoftware/mender-ci-workflows/master/examples/hello-mender.py
           chmod 755 hello-mender.py

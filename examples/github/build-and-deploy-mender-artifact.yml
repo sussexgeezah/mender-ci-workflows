@@ -40,12 +40,14 @@ jobs:
       - uses: actions/checkout@v3
       # Initialise the workspace
       - name: Init workspace
+        shell: bash
         run: |
           mkdir -p ${MENDER_ARTIFACTS_CI_ARTIFACT_PATH}
       # Generates the required variables to later create the Mender Artifact, using a dummy application
       # name "change-the-world-to-better" with a random version.
       - name: Generate Mender release name
         id: release_name
+        shell: bash
         run: |
           APP_NAME=change-the-world-to-better
           VERSION="$(($RANDOM%9+1)).$(($RANDOM%9+1)).$(($RANDOM%9+1))"
@@ -56,6 +58,7 @@ jobs:
       # Mender deployment group name based on the branch name to later create the Mender deployment
       - name: Choose Mender deployment group
         id: deployment_group
+        shell: bash
         run: |
           if [[ "${GITHUB_BASE_REF}" == "production" ]]; then
             MENDER_DEPLOYMENT_DEVICES_GROUP=${MENDER_DEPLOYMENT_DEVICES_GROUP_PROD}
@@ -69,6 +72,7 @@ jobs:
       # Generates Mender deployment name to later create the Mender deployment
       - name: Generate Mender deployment name
         id: deployment_name
+        shell: bash
         run: |
           COMMIT_SHORT_SHA="${GITHUB_SHA:0:8}"
           MENDER_DEPLOYMENT_NAME=${MENDER_RELEASE_NAME}_${COMMIT_SHORT_SHA}
@@ -80,6 +84,7 @@ jobs:
       # https://docs.mender.io/artifact-creation/create-an-artifact
       - name: Create Mender Artifact
         id: create_artifact
+        shell: bash
         run: |
           curl -O https://raw.githubusercontent.com/mendersoftware/mender-ci-workflows/master/examples/hello-mender.py
           chmod 755 hello-mender.py

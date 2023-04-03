@@ -36,6 +36,7 @@ jobs:
       # package it as a Single File Application Update. For more information visit Mender docs:
       # https://docs.mender.io/artifact-creation/create-an-artifact
       - name: Create Mender Artifact
+        shell: bash
         run: |
           curl -O https://raw.githubusercontent.com/mendersoftware/mender-ci-workflows/master/examples/hello-mender.py
           chmod 755 hello-mender.py
