@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2022 Northern.tech AS
+# Copyright 2023 Northern.tech AS
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ CONNECT_WITH_US = """Connect with us:
 * Join the Mender Hub discussion forum: https://hub.mender.io
 * Follow us on Twitter: https://twitter.com/mender_io. Please feel free to tweet us questions.
 * Fork us on GitHub: https://github.com/mendersoftware
-* Create an issue in the bugtracker: https://tracker.mender.io/projects/MEN
+* Create an issue in the bugtracker: https://northerntech.atlassian.net/projects/MEN
 * Email us at contact@mender.io: mailto:contact@mender.io
 * Connect to the #mender IRC channel on Libera: https://web.libera.chat/?#mender
 """
