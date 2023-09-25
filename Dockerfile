@@ -1,13 +1,13 @@
-ARG MENDER_CLI_VERSION=1.9.0
-ARG MENDER_ARTIFACT_VERSION=3.9.0
-ARG MENDER_CLIENT_VERSION=3.4.0
+ARG MENDER_CLI_VERSION=1.11.0
+ARG MENDER_ARTIFACT_VERSION=3.10.1
+ARG MENDER_CLIENT_VERSION=3.5.1
 
 FROM golang:1.21 as cli-builder
 WORKDIR /go/src/github.com/mendersoftware/mender-cli
 ARG MENDER_CLI_VERSION
 RUN git clone https://github.com/mendersoftware/mender-cli.git . && \
     git checkout $MENDER_CLI_VERSION && \
-    make get-deps && \
+    make get-build-deps && \
     make build
 
 FROM golang:1.21 as artifact-builder
